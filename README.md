@@ -23,40 +23,73 @@ python Embeded2RAG.py \
   --vector-store chroma
 ```
 
-RAG 목록 확인:
-```bash
-python Embeded2RAG.py --rag-name dummy --list-rags
-```
-
-> 참고: 아직 벡터 DB/모델이 미정이면 `--dry-run`으로 JSON+Chunk 생성만 먼저 수행할 수 있습니다.
-
-## 2) RAG2Chatbot.py
-
-기능:
-- Streamlit 채팅 UI
-- RAG 목록 표시 + 체크박스 다중 선택
-- 선택된 여러 RAG를 하나의 Retriever로 병합
+## 2) RAG2Chatbot.py (로컬 모델/로컬 벡터DB 버전)
 
 실행:
 ```bash
 streamlit run RAG2Chatbot.py
 ```
 
-사이드바에서:
-- RAG 저장 경로
-- Embedding 모델(HF ID 또는 로컬 경로)
-- LLM 종류/모델
-- top_k
-- 체크박스로 다중 RAG 선택
+## 3) RAG2Chatbot_API.py (RAG API + LLM API 버전)
 
-## 모델/DB 교체 포인트
+요구사항 반영:
+- 로컬 벡터DB 대신 외부 **RAG API** 호출 (`/rags`, `/retrieve`)
+- 로컬 LLM 대신 외부 **LLM API(OpenAI-compatible)** 호출 (`/v1/chat/completions`)
+- RAG 다중 선택(또는 수동 입력) 지원
+
+실행:
+```bash
+streamlit run RAG2Chatbot_API.py
+```
+
+권장 RAG API 응답 예시:
+```json
+{
+  "contexts": [
+    {"text": "...", "source": "finance.xlsx", "metadata": {"sheet": "Q1"}}
+  ]
+}
+```
+
+## 4) EvalsetBuilder.py (평가셋 생성 앱)
+
+요구사항 반영:
+- **RAG에 저장된 chunks를 순서/샘플 기반으로 불러와 평가셋 생성**
+- **RAG 입력 전 단계(raw_json) 파일 기반으로 평가셋 생성**
+- 생성 후 UI에서 질문/정답/소스 편집 가능
+- JSONL로 저장 후 `eval_rag.py`에 바로 투입 가능
+
+실행:
+```bash
+streamlit run EvalsetBuilder.py
+```
+
+## 5) eval_rag.py (평가 실행)
+
+평가셋(JSONL 또는 JSON 배열) 실행 예:
+```bash
+python eval_rag.py \
+  --dataset ./evaluation/generated_evalset.jsonl \
+  --base-dir ./rag_store \
+  --rags finance hr \
+  --embed-model sentence-transformers/all-MiniLM-L6-v2 \
+  --llm-kind hf-pipeline \
+  --llm-model gpt2 \
+  --k 4 \
+  --out ./evaluation/report.csv
+```
+
+## 모델/DB/API 교체 포인트
 
 - `Embeded2RAG.py`
   - `build_embeddings()`
   - `build_vector_store()`
-- `RAG2Chatbot.py`
+- `rag_core.py`
   - `build_embeddings()`
   - `build_llm()`
   - `get_vectorstore_for_rag()`
+- `api_clients.py`
+  - `retrieve_contexts()` (RAG API 계약)
+  - `call_llm_chat_api()` (LLM API 계약)
 
-중국 내에서 다운로드 가능한 모델/DB 확정 후 위 함수만 교체하면 전체 로직 재사용이 가능합니다.
+중국 내에서 사용 가능한 인프라 확정 후 위 함수만 교체하면 전체 로직 재사용이 가능합니다.
