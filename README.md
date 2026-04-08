@@ -23,6 +23,18 @@ python Embeded2RAG.py \
   --vector-store chroma
 ```
 
+Qdrant 예시:
+```bash
+python Embeded2RAG.py \
+  --rag-name finance \
+  --excel ./data/sales.xlsx \
+  --embed-kind hf-local \
+  --embed-model BAAI/bge-m3 \
+  --vector-store qdrant \
+  --qdrant-url http://127.0.0.1:6333 \
+  --qdrant-collection finance
+```
+
 ## 2) RAG2Chatbot.py (로컬 모델/로컬 벡터DB 버전)
 
 실행:

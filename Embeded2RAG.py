@@ -193,7 +193,16 @@ def build_embeddings(kind: str, model_name_or_path: str):
     )
 
 
-def build_vector_store(store_kind: str, persist_dir: str, embeddings, documents: List[Document]):
+def build_vector_store(
+    store_kind: str,
+    persist_dir: str,
+    embeddings,
+    documents: List[Document],
+    qdrant_url: Optional[str] = None,
+    qdrant_api_key: Optional[str] = None,
+    qdrant_collection: Optional[str] = None,
+    qdrant_prefer_grpc: bool = False,
+):
     store_kind = store_kind.lower().strip()
 
     if store_kind == "chroma":
@@ -203,6 +212,23 @@ def build_vector_store(store_kind: str, persist_dir: str, embeddings, documents:
             documents=documents,
             embedding=embeddings,
             persist_directory=persist_dir,
+        )
+
+    if store_kind == "qdrant":
+        from langchain_community.vectorstores import Qdrant
+
+        if not qdrant_url:
+            raise ValueError("qdrant 사용 시 --qdrant-url 이 필요합니다. 예) http://127.0.0.1:6333")
+        if not qdrant_collection:
+            raise ValueError("qdrant 사용 시 --qdrant-collection 이 필요합니다.")
+
+        return Qdrant.from_documents(
+            documents=documents,
+            embedding=embeddings,
+            url=qdrant_url,
+            api_key=qdrant_api_key,
+            prefer_grpc=qdrant_prefer_grpc,
+            collection_name=qdrant_collection,
         )
 
     raise ValueError(
@@ -294,7 +320,11 @@ def parse_args() -> argparse.Namespace:
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="허깅페이스 모델 ID 또는 로컬 경로",
     )
-    parser.add_argument("--vector-store", default="chroma", help="현재: chroma")
+    parser.add_argument("--vector-store", default="chroma", help="chroma | qdrant")
+    parser.add_argument("--qdrant-url", default=None, help="예) http://127.0.0.1:6333")
+    parser.add_argument("--qdrant-api-key", default=None, help="Qdrant API Key (옵션)")
+    parser.add_argument("--qdrant-collection", default=None, help="Qdrant 컬렉션명 (기본: rag_name)")
+    parser.add_argument("--qdrant-prefer-grpc", action="store_true", help="Qdrant gRPC 사용")
 
     parser.add_argument("--dry-run", action="store_true", help="벡터 DB 저장 없이 JSON/Chunk까지만 수행")
     parser.add_argument("--list-rags", action="store_true", help="생성된 RAG 목록 조회")
@@ -346,7 +376,17 @@ def main() -> None:
         return
 
     embeddings = build_embeddings(args.embed_kind, args.embed_model)
-    vector_store = build_vector_store(args.vector_store, dirs["vectordb_dir"], embeddings, chunks)
+    qdrant_collection = args.qdrant_collection or args.rag_name
+    vector_store = build_vector_store(
+        store_kind=args.vector_store,
+        persist_dir=dirs["vectordb_dir"],
+        embeddings=embeddings,
+        documents=chunks,
+        qdrant_url=args.qdrant_url,
+        qdrant_api_key=args.qdrant_api_key,
+        qdrant_collection=qdrant_collection,
+        qdrant_prefer_grpc=args.qdrant_prefer_grpc,
+    )
 
     # some stores expose persist()
     if hasattr(vector_store, "persist"):
