@@ -21,8 +21,8 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 # -----------------------------

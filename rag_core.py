@@ -7,8 +7,8 @@ import pathlib
 from dataclasses import dataclass
 from typing import List
 
-from langchain.chains import RetrievalQA
-from langchain.schema import BaseRetriever
+from langchain_classic.chains import RetrievalQA
+from langchain_core.retrievers import BaseRetriever
 from langchain_community.vectorstores import Chroma
 
 
