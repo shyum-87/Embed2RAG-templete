@@ -38,6 +38,16 @@ try:
 except Exception:  # pragma: no cover
     Presentation = None
 
+try:
+    from pypdf import PdfReader  # PDF
+except Exception:  # pragma: no cover
+    PdfReader = None
+
+try:
+    from docx import Document as DocxDocument  # Word (DOCX)
+except Exception:  # pragma: no cover
+    DocxDocument = None
+
 
 # -----------------------------
 # Data models
@@ -137,6 +147,49 @@ def read_db_table(sqlite_db_path: str, table_name: str, limit: Optional[int] = N
             )
         )
     return records
+
+
+def read_pdf(path: str) -> List[RawRecord]:
+    if PdfReader is None:
+        raise RuntimeError("pypdf가 설치되어야 PDF를 읽을 수 있습니다.")
+
+    reader = PdfReader(path)
+    records: List[RawRecord] = []
+    for i, page in enumerate(reader.pages):
+        text = (page.extract_text() or "").strip()
+        if not text:
+            continue
+        records.append(
+            RawRecord(
+                source_type="pdf",
+                source_path=path,
+                title=f"{os.path.basename(path)}::page_{i+1}",
+                text=text,
+                metadata={"page_number": i + 1},
+            )
+        )
+    return records
+
+
+def read_word(path: str) -> List[RawRecord]:
+    if DocxDocument is None:
+        raise RuntimeError("python-docx가 설치되어야 Word 파일을 읽을 수 있습니다.")
+
+    doc = DocxDocument(path)
+    paragraphs = [p.text.strip() for p in doc.paragraphs if p.text and p.text.strip()]
+    text = "\n".join(paragraphs).strip()
+    if not text:
+        return []
+
+    return [
+        RawRecord(
+            source_type="word",
+            source_path=path,
+            title=os.path.basename(path),
+            text=text,
+            metadata={"paragraph_count": len(paragraphs)},
+        )
+    ]
 
 
 # -----------------------------
@@ -306,6 +359,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--excel", nargs="*", default=[], help="Excel 파일(.xlsx) 목록")
     parser.add_argument("--ppt", nargs="*", default=[], help="PPT 파일(.pptx) 목록")
+    parser.add_argument("--pdf", nargs="*", default=[], help="PDF 파일(.pdf) 목록")
+    parser.add_argument("--word", nargs="*", default=[], help="Word 파일(.docx) 목록")
 
     parser.add_argument("--sqlite-db", default=None, help="SQLite DB 파일 경로")
     parser.add_argument("--db-table", nargs="*", default=[], help="인덱싱할 테이블 목록")
@@ -350,6 +405,12 @@ def main() -> None:
 
     for ppt_path in args.ppt:
         all_records.extend(read_ppt(ppt_path))
+
+    for pdf_path in args.pdf:
+        all_records.extend(read_pdf(pdf_path))
+
+    for word_path in args.word:
+        all_records.extend(read_word(word_path))
 
     if args.sqlite_db and args.db_table:
         for t in args.db_table:
